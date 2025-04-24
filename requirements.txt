@@ -1,6 +1,7 @@
 chainlit
 fastmcp
-llama-index
+litellm
+mistralai
 openai
 pandas
 yfinance

@@ -1,5 +1,6 @@
 import chainlit as cl
-from config.settings import llm
+import litellm
+from config.settings import openai_llm, mistral_llm
 
 @cl.on_chat_start
 async def on_start():
