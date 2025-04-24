@@ -1,0 +1,6 @@
+chainlit
+fastmcp
+llama-index
+openai
+pandas
+yfinance
