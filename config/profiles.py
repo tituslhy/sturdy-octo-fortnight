@@ -4,7 +4,7 @@ import chainlit as cl
 async def chat_profile(current_user: cl.User):
     if current_user.metadata["role"] != "ADMIN":
         return None
-
+        
     return [
         cl.ChatProfile(
             name="OpenAI",
