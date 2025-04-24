@@ -1,4 +1,5 @@
-# from llama_index.llms.openai import OpenAI
+from dotenv import load_dotenv, find_dotenv
 from openai import AsyncOpenAI
 
-llm = AsyncOpenAI(model="gpt-4o-mini", temperature=0)
+_ = load_dotenv(find_dotenv())
+llm = AsyncOpenAI()
