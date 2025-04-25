@@ -2,7 +2,10 @@ import chainlit as cl
 import litellm
 from config.settings import openai_llm, mistral_llm
 from config.profiles import chat_profile
-from connection.mcp_handler 
+from connection.mcp_handler import (
+    on_mcp_connect,
+    on_mcp_disconnect
+)
 from auth.auth_handler import auth_callback
 
 @cl.on_chat_start
