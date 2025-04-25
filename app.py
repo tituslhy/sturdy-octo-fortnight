@@ -2,14 +2,19 @@ import os
 from dotenv import load_dotenv, find_dotenv
 
 import chainlit as cl
-import litellm
-from config.settings import openai_llm
 from config.profiles import chat_profile
 from connection.mcp_handler import (
     on_mcp_connect,
     on_mcp_disconnect
 )
 from auth.auth_handler import auth_callback
+from src.chat_tool_steps import (
+    execute_tool,
+    ask_litellm,
+    ask_openai
+)
+from src.map_tool_steps import move_map_to
+from src.mcp_tool_steps import execute_mcp_tool
 
 _ = load_dotenv(find_dotenv())
 
@@ -17,7 +22,7 @@ _ = load_dotenv(find_dotenv())
 async def on_chat_start():
     chat_profile = cl.user_session.get("chat_profile")
     if chat_profile == "OpenAI":
-        cl.user_session.set("llm", openai_llm)
+        cl.user_session.set("llm", "gpt-4o-mini")
     elif chat_profile == "Mistral":
         cl.user_session.set(
             "llm",
