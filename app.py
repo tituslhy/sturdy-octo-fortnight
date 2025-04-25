@@ -2,7 +2,8 @@ import chainlit as cl
 import litellm
 from config.settings import openai_llm, mistral_llm
 from config.profiles import chat_profile
-from auth.password import auth_callback
+from connection.mcp_handler 
+from auth.auth_handler import auth_callback
 
 @cl.on_chat_start
 async def on_chat_start():
