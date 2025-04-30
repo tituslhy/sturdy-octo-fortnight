@@ -98,11 +98,12 @@ async def on_message(message: cl.Message):
 
 @cl.action_callback("close_map")
 async def on_test_action():
+    """Callback handler to close the map"""
     await cl.ElementSidebar.set_elements([])
-
 
 @cl.set_starters
 async def set_starters():
+    """Chat starter suggestions!"""
     return [
         cl.Starter(
             label="Show me Paris",
