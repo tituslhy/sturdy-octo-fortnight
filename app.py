@@ -279,6 +279,7 @@ async def on_mcp_connect(connection):
     """Handler to connect to an MCP server. 
     Lists tools available on the server and connects these tools to
     the LLM agent."""
+    
     mcp_cache = cl.user_session.get("mcp_tool_cache", {})
     mcp_tools = cl.user_session.get("mcp_tools", {})
     agent_tools = cl.user_session.get("agent_tools", [])
@@ -314,6 +315,7 @@ async def on_mcp_disconnect(name: str):
     """Handler to handle disconnects from an MCP server.
     Updates tool list available for the LLM agent.
     """
+    
     agent_tools = cl.user_session.get("agent_tools", [])
     mcp_tools = cl.user_session.get("mcp_tools", {})
     mcp_cache = cl.user_session.get("mcp_tool_cache", {})
