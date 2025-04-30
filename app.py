@@ -22,6 +22,7 @@ llm = OpenAI("gpt-4o-mini", temperature=0)
 
 @cl.password_auth_callback
 def auth_callback(username: str, password: str) -> Optional[cl.User]:
+    """Password auth handler"""
     if (username, password) == ("admin", "admin"):
         return cl.User(identifier="admin", metadata={"role": "ADMIN"})
     else:
@@ -30,6 +31,7 @@ def auth_callback(username: str, password: str) -> Optional[cl.User]:
 @cl.on_chat_start
 async def start():
     """Handler for chat start events. Sets session variables."""
+    
     agent_tool = FunctionTool.from_defaults(async_fn=move_map_to)
     cl.user_session.set("agent_tools", [agent_tool])
     cl.user_session.set("mcp_tools", {})
@@ -52,6 +54,8 @@ async def start():
 
 @cl.on_message
 async def on_message(message: cl.Message):
+    """On message handler to handle message received events"""
+    
     agent = cl.user_session.get("agent")
     memory = cl.user_session.get("memory")
     chat_history = memory.get()
