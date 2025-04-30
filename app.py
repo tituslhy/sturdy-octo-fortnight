@@ -2,6 +2,7 @@ import chainlit as cl
 import os
 from dotenv import load_dotenv, find_dotenv
 from collections import defaultdict
+from typing import Optional
 
 from llama_index.core.agent.workflow import FunctionAgent, AgentStream, ToolCall
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
@@ -19,21 +20,12 @@ _ = load_dotenv(find_dotenv())
 
 llm = OpenAI("gpt-4o-mini", temperature=0)
 
-@cl.step(type="tool")
-async def move_map_to(latitude: float, longitude: float):
-    "Move the map to the given latitude and longitude."
-    
-    await open_map(
-        latitude=latitude,
-        longitude=longitude
-    )
-
-    fn = cl.CopilotFunction(
-        name="move-map", args={"latitude": latitude, "longitude": longitude}
-    )
-    await fn.acall()
-
-    return "Map moved!"
+@cl.password_auth_callback
+def auth_callback(username: str, password: str) -> Optional[cl.User]:
+    if (username, password) == ("admin", "admin"):
+        return cl.User(identifier="admin", metadata={"role": "ADMIN"})
+    else:
+        return None
 
 @cl.on_chat_start
 async def start():
@@ -191,6 +183,22 @@ async def on_mcp_disconnect(name: str):
     await cl.Message(f"Disconnected from MCP server: {name}").send()
 
 ## Map utilities
+@cl.step(type="tool")
+async def move_map_to(latitude: float, longitude: float):
+    """Move the map to the given latitude and longitude."""
+    
+    await open_map(
+        latitude=latitude,
+        longitude=longitude
+    )
+
+    fn = cl.CopilotFunction(
+        name="move-map", args={"latitude": latitude, "longitude": longitude}
+    )
+    await fn.acall()
+
+    return "Map moved!"
+
 async def open_map(
     latitude: float = 1.290270, 
     longitude: float = 103.851959
