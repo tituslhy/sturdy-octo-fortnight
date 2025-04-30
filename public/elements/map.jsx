@@ -34,7 +34,7 @@ export default function GoogleMap() {
 
     // Load the script only if it's not already loaded or loading
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?&callback=initMap`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAAyjt8PlHMADzCoG6KUp6i7ACvoNeOgAQ&callback=initMap`;
     script.async = true;
     script.defer = true;
 
