@@ -135,6 +135,8 @@ async def set_starters():
 ## Audio handlers
 @cl.on_audio_start
 async def on_audio_start():
+    """Handler to manage mic button click event"""
+    
     cl.user_session.set("silent_duration_ms", 0)
     cl.user_session.set("is_speaking", False)
     cl.user_session.set("audio_chunks", [])
@@ -142,6 +144,8 @@ async def on_audio_start():
 
 @cl.on_audio_chunk
 async def on_audio_chunk(chunk: cl.InputAudioChunk):
+    """Handller function to manage audio chunks"""
+    
     audio_chunks = cl.user_session.get("audio_chunks")
 
     if audio_chunks is not None:
@@ -181,7 +185,8 @@ async def on_audio_chunk(chunk: cl.InputAudioChunk):
             cl.user_session.set("is_speaking", True)
     
 async def process_audio():
-    # Get the audio buffer from the session
+    """ Processes the audio buffer from the session"""
+    
     if audio_chunks := cl.user_session.get("audio_chunks"):
         # Concatenate all chunks
         concatenated = np.concatenate(list(audio_chunks))
@@ -243,7 +248,7 @@ async def process_audio():
                 continue
     
     response = await handler
-    
+    await msg.send()
     memory.put(
         ChatMessage(
             role = MessageRole.USER,
@@ -257,18 +262,16 @@ async def process_audio():
         )
     )
     cl.user_session.set("memory", memory)
-    
-    await msg.send()
 
-    output_name, output_audio = await text_to_speech(response, "audio/wav")
+    _, output_audio = await text_to_speech(str(response), "audio/wav")
 
     output_audio_el = cl.Audio(
         auto_play=True,
         mime="audio/wav",
         content=output_audio,
     )
-
-    await cl.Message(content=response, elements=[output_audio_el]).send()
+    msg.elements=[output_audio_el]
+    await msg.update()
 
 ## MCP Utilities
 @cl.on_mcp_connect
@@ -342,7 +345,7 @@ async def on_mcp_disconnect(name: str):
 @cl.step(type="tool")
 async def speech_to_text(audio_file):
     response = await openai_client.audio.transcriptions.create(
-        model="whisper-1", file=audio_file
+        model="whisper-1", file=audio_file, language="en",
     )
 
     return response.text
