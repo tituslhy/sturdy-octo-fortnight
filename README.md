@@ -2,7 +2,7 @@
 The Chainlit introduction repository
 
 <p align="center">
-    <img src="./images/Home.png">
+    <img src="./public/Home.png">
 </p>
 
 ## Setup
@@ -13,13 +13,13 @@ pip install -r requirements.txt
 
 ## The Jira MCP
 <p align="center">
-    <img src="./images/jira_issue_assignment.png">
+    <img src="./public/jira_issue_assignment.png">
 </p>
 <p align="center">
-    <img src="./images/jira_mark_as_complete.png">
+    <img src="./public/jira_mark_as_complete.png">
 </p>
 <p align="center">
-    <img src="./images/jira_dashboard.png">
+    <img src="./public/jira_dashboard.png">
 </p>
 
 #### Pull the docker image
