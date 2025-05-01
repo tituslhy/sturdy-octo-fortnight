@@ -1,5 +1,6 @@
 import chainlit as cl
 from chainlit.types import ThreadDict
+from chainlit.input_widget import Select, Switch, Slider
 from fastapi import Request, Response
 
 import os
@@ -29,7 +30,6 @@ logger = logging.getLogger(__name__)
 
 _ = load_dotenv(find_dotenv())
 
-openai_llm = OpenAI(model="gpt-4o-mini", temperature=0)
 openai_client = AsyncOpenAI() #for whisper
 
 ## Audio settings
@@ -37,6 +37,11 @@ SILENCE_THRESHOLD = 3500  # Adjust based on your audio level (e.g., lower for qu
 SILENCE_TIMEOUT = 1300.0  # Seconds of silence to consider the turn finished
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
+
+SYSTEM_PROMPTS = {
+    "The Assistant": "You are a helpful AI assistant. You can access tools using MCP servers if available.",
+    "The Cowboy": "You are a helpful AI assistant who is also a cowboy! You can access tools using MCP servers if available but answer like a cowboy!",
+}
 
 @cl.password_auth_callback
 def auth_callback(username: str, password: str) -> Optional[cl.User]:
@@ -47,36 +52,93 @@ def auth_callback(username: str, password: str) -> Optional[cl.User]:
     else:
         return None
 
-@cl.on_logout
-def on_logout(request: Request, response: Response):
-    ### Handler to tidy up resources
-    logger.info("Clearing cookies...")
-    for cookie_name in request.cookies.keys():
-        response.delete_cookie(cookie_name)
+@cl.set_chat_profiles
+async def chat_profiles():
+    """Chat profile setter."""
+    
+    return [
+        cl.ChatProfile(
+            name="The Assistant",
+            markdown_description="This LLM is your personal assistant",
+            icon = "public/assistant.png"
+        ),
+        cl.ChatProfile(
+            name="The Cowboy",
+            markdown_description="This LLM is a personal assistant who is also a cowboy",
+            icon = "public/cowboy.png"
+        )
+    ]
 
 @cl.on_chat_start
 async def start():
     """Handler for chat start events. Sets session variables."""
-    # await open_map()
     
+    # await open_map()
+    openai_llm = OpenAI(model="gpt-4o-mini", temperature=0)
     agent_tool = FunctionTool.from_defaults(async_fn=move_map_to)
     agent = FunctionAgent(tools=[agent_tool],llm=openai_llm,)
+    chat_profile = cl.user_session.get("chat_profile")
     user = cl.user_session.get("user")
     logger.info(f"{user.identifier} has started the conversation")
     
+    cl.user_session.set("llm", openai_llm)
     cl.user_session.set("agent_tools", [agent_tool])
     cl.user_session.set("context", Context(agent))
     cl.user_session.set("mcp_tools", {})
     cl.user_session.set("mcp_tool_cache", defaultdict(list))
     cl.user_session.set("agent", agent)
+    
+    system_prompt = SYSTEM_PROMPTS[chat_profile]
     memory = ChatMemoryBuffer.from_defaults()
     memory.put(
         ChatMessage(
             role=MessageRole.SYSTEM, 
-            content="You are a helpful AI assistant. You can access tools using MCP servers if available."
+            content=system_prompt
         )
     )
-    cl.user_session.set("memory",memory)
+    cl.user_session.set("memory", memory)
+    
+    settings = await cl.ChatSettings(
+        [
+            (
+                Select(
+                    id="LLM",
+                    label="OpenAI model to use",
+                    values=["gpt-4o-mini", "gpt-4o"],
+                    initial_index=0,
+                ),
+                Slider(
+                    id="Temperature",
+                    label="Temperature of the LLM",
+                    initial=0,
+                    min=0,
+                    max=1,
+                    step=0.1
+                )
+            )
+        ]
+    ).send()
+
+@cl.on_settings_update
+async def setup_agent(settings):
+    """Handler to manage settings updates"""
+    
+    openai_llm = OpenAI(
+        model=settings["LLM"], 
+        temperature=settings["Temperature"]
+    )
+    logger.info(f"New settings received. LLM: {settings["LLM"]} | Temperature: {settings["Temperature"]}")
+    cl.user_session.set("llm", openai_llm)
+    
+    agent_tools = cl.user_session.get("agent_tools")
+    mcp_tools = cl.user_session.get("mcp_tools", {})
+    if len(mcp_tools) > 0:
+        agent = FunctionAgent(tools=agent_tools + list(mcp_tools.values()),llm=openai_llm)
+    else:
+        agent = FunctionAgent(tools=agent_tools, llm=openai_llm)
+    logger.info("Agent instantiated")
+    cl.user_session.set("agnet", agent)
+    
 
 @cl.on_message
 async def on_message(message: cl.Message):
@@ -91,6 +153,8 @@ async def on_message(message: cl.Message):
     msg = cl.Message("", type="assistant_message")
     
     context = cl.user_session.get("context")
+    
+    logger.info("Running agent on question")
     handler = agent.run(
         message.content, 
         chat_history = chat_history,
@@ -135,9 +199,39 @@ def on_chat_end():
     user = cl.user_session.get("user")
     logger.info(f"{user.identifier} has ended the chat")
 
+@cl.on_logout
+def on_logout(request: Request, response: Response):
+    ### Handler to tidy up resources
+    logger.info("Clearing cookies...")
+    for cookie_name in request.cookies.keys():
+        response.delete_cookie(cookie_name)
+
 @cl.on_chat_resume
 async def on_chat_resume(thread: ThreadDict):
     """Handler function to resume a chat"""
+    
+    ## Setup LLM
+    openai_llm = OpenAI(model="gpt-4o-mini", temperature=0)
+    settings = await cl.ChatSettings(
+        [
+            (
+                Select(
+                    id="LLM",
+                    label="OpenAI model to use",
+                    values=["gpt-4o-mini", "gpt-4o"],
+                    initial_index=0,
+                ),
+                Slider(
+                    id="Temperature",
+                    label="Temperature of the LLM",
+                    initial=0,
+                    min=0,
+                    max=1,
+                    step=0.1
+                )
+            )
+        ]
+    ).send()
     
     ## Restore memory buffer
     memory = ChatMemoryBuffer.from_defaults()
