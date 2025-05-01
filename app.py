@@ -229,8 +229,9 @@ async def on_chat_resume(thread: ThreadDict):
     
     ## Restore memory buffer
     memory = ChatMemoryBuffer.from_defaults()
-    root_messages = [m for m in thread["steps"] if m["parentId"] == None]
+    root_messages = [m for m in thread["steps"]]
     for message in root_messages:
+        print(message)
         if message["type"] == "user_message":
             memory.put(
                 ChatMessage(
