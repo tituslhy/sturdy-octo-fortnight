@@ -168,7 +168,7 @@ async def on_chat_resume(thread: ThreadDict):
     
     if len(mcp_tools)>0:
         agent = FunctionAgent(
-            tools=agent_tools.extend(list(mcp_tools.values())), #agent still has tools not removed
+            tools=agent_tools + list(mcp_tools.values()), #agent still has tools not removed
             llm=openai_llm,
         )
     else:
@@ -286,7 +286,7 @@ async def on_mcp_connect(connection):
                 mcp_tools[tool.metadata.name] = tool
                 mcp_cache[connection.name].append(tool.metadata.name)
         agent = FunctionAgent(
-            tools=agent_tools.extend(list(mcp_tools.values())),
+            tools=agent_tools + list(mcp_tools.values()),
             llm=openai_llm,
         )
         cl.user_session.set("agent", agent)
@@ -319,7 +319,7 @@ async def on_mcp_disconnect(name: str):
     # Update tools list in agent
     if len(mcp_tools)>0:
         agent = FunctionAgent(
-            tools=agent_tools.extend(list(mcp_tools.values())), #agent still has tools not removed
+            tools=agent_tools + list(mcp_tools.values()), #agent still has tools not removed
             llm=openai_llm,
         )
     else:
