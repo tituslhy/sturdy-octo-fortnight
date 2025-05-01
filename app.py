@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 _ = load_dotenv(find_dotenv())
 
-llm = OpenAI("gpt-4o-mini", temperature=0)
+openai_llm = OpenAI("gpt-4o-mini", temperature=0)
 openai_client = AsyncOpenAI() #for whisper
 
 ## Audio settings
@@ -48,9 +48,10 @@ def auth_callback(username: str, password: str) -> Optional[cl.User]:
 @cl.on_chat_start
 async def start():
     """Handler for chat start events. Sets session variables."""
+    await open_map()
     
     agent_tool = FunctionTool.from_defaults(async_fn=move_map_to)
-    agent = FunctionAgent(tools=[agent_tool],llm=llm,)
+    agent = FunctionAgent(tools=[agent_tool],llm=openai_llm,)
     
     cl.user_session.set("agent_tools", [agent_tool])
     cl.user_session.set("context", Context(agent))
@@ -109,6 +110,7 @@ async def on_message(message: cl.Message):
 @cl.action_callback("close_map")
 async def on_test_action():
     """Callback handler to close the map"""
+    await cl.Message(content="Closed map! 🗺️").send()
     await cl.ElementSidebar.set_elements([])
 
 @cl.set_starters
@@ -296,7 +298,7 @@ async def on_mcp_connect(connection):
                 mcp_cache[connection.name].append(tool.metadata.name)
         agent = FunctionAgent(
             tools=agent_tools.extend(list(mcp_tools.values())),
-            llm=llm,
+            llm=openai_llm,
         )
         cl.user_session.set("agent", agent)
         cl.user_session.set("context", Context(agent))
@@ -329,12 +331,12 @@ async def on_mcp_disconnect(name: str):
     if len(mcp_tools)>0:
         agent = FunctionAgent(
             tools=agent_tools.extend(list(mcp_tools.values())), #agent still has tools not removed
-            llm=llm,
+            llm=openai_llm,
         )
     else:
         agent = FunctionAgent(
             tools=agent_tools,
-            llm=llm,
+            llm=openai_llm,
         )
     cl.user_session.set("context", Context(agent))
     cl.user_session.set("mcp_tools", mcp_tools)
