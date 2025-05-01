@@ -3,6 +3,7 @@ from chainlit.types import ThreadDict
 from chainlit.input_widget import Select, Switch, Slider
 from fastapi import Request, Response
 
+import logging
 import os
 from dotenv import load_dotenv, find_dotenv
 from collections import defaultdict
@@ -23,29 +24,21 @@ from llama_index.core.workflow import Context
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.llms.openai import OpenAI
 from llama_index.tools.mcp import BasicMCPClient, McpToolSpec
-
 from openai import AsyncOpenAI
 
-import logging
-
+### Global settings
 logger = logging.getLogger(__name__)
-
 _ = load_dotenv(find_dotenv())
-
-openai_client = AsyncOpenAI() #for whisper
+openai_client = AsyncOpenAI() #for whisper and dall-e-3
 embed_model = OllamaEmbedding(model_name="nomic-embed-text")
-
-## Audio settings
 SILENCE_THRESHOLD = 3500  # Adjust based on your audio level (e.g., lower for quieter audio)
 SILENCE_TIMEOUT = 1300.0  # Seconds of silence to consider the turn finished
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
-
 SYSTEM_PROMPTS = {
     "The Assistant": "You are a helpful AI assistant. You can access tools using MCP servers if available.",
     "The Cowboy": "You are a helpful AI assistant who is also a cowboy! You can access tools using MCP servers if available but answer like a cowboy!",
 }
-
 commands = [
     {"id": "Picture", "icon": "image", "description": "Use DALL-E"},
 ]
@@ -555,7 +548,6 @@ async def process_audio():
 
         # Reset buffer position
         wav_buffer.seek(0)
-
         cl.user_session.set("audio_chunks", [])
 
     frames = wav_file.getnframes()
@@ -567,9 +559,7 @@ async def process_audio():
         return
 
     audio_buffer = wav_buffer.getvalue()
-
     input_audio_el = cl.Audio(content=audio_buffer, mime="audio/wav")
-
     whisper_input = ("audio.wav", audio_buffer, "audio/wav")
     transcription = await speech_to_text(whisper_input)
     
