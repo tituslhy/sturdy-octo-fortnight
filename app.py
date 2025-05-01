@@ -48,7 +48,7 @@ def auth_callback(username: str, password: str) -> Optional[cl.User]:
 @cl.on_chat_start
 async def start():
     """Handler for chat start events. Sets session variables."""
-    await open_map()
+    # await open_map()
     
     agent_tool = FunctionTool.from_defaults(async_fn=move_map_to)
     agent = FunctionAgent(tools=[agent_tool],llm=openai_llm,)
