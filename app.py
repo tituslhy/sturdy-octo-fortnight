@@ -54,8 +54,8 @@ commands = [
 def auth_callback(username: str, password: str) -> Optional[cl.User]:
     """Password auth handler for login"""
     
-    if (username, password) == ("admin", "admin"):
-        return cl.User(identifier="admin", metadata={"role": "ADMIN"})
+    if (username, password) == ("titus", "titus"):
+        return cl.User(identifier="Titus", metadata={"role": "ADMIN"})
     else:
         return None
 
