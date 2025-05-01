@@ -1,7 +1,5 @@
 chainlit
-fastmcp
-litellm
-mistralai
+llama-index
 openai
-pandas
-yfinance
+numpy
+fastapi

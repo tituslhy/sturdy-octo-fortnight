@@ -47,6 +47,13 @@ def auth_callback(username: str, password: str) -> Optional[cl.User]:
     else:
         return None
 
+@cl.on_logout
+def on_logout(request: Request, response: Response):
+    ### Handler to tidy up resources
+    logger.info("Clearing cookies...")
+    for cookie_name in request.cookies.keys():
+        response.delete_cookie(cookie_name)
+
 @cl.on_chat_start
 async def start():
     """Handler for chat start events. Sets session variables."""
@@ -174,14 +181,6 @@ async def on_chat_resume(thread: ThreadDict):
     
     user = cl.user_session.get("user")
     logger.info(f"{user} has resumed chat")
-    
-
-@cl.on_logout
-def on_logout(request: Request, response: Response):
-    ### Handler to tidy up resources
-    logger.info("Clearing cookies...")
-    for cookie_name in request.cookies.keys():
-        response.delete_cookie(cookie_name)
     
 @cl.action_callback("close_map")
 async def on_test_action():
