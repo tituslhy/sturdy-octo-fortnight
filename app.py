@@ -1,4 +1,6 @@
 import chainlit as cl
+from chainlit.types import ThreadDict
+from fastapi import Request, Response
 
 import os
 from dotenv import load_dotenv, find_dotenv
@@ -27,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 _ = load_dotenv(find_dotenv())
 
-openai_llm = OpenAI("gpt-4o-mini", temperature=0)
+openai_llm = OpenAI(model="gpt-4o-mini", temperature=0)
 openai_client = AsyncOpenAI() #for whisper
 
 ## Audio settings
@@ -52,6 +54,8 @@ async def start():
     
     agent_tool = FunctionTool.from_defaults(async_fn=move_map_to)
     agent = FunctionAgent(tools=[agent_tool],llm=openai_llm,)
+    user = cl.user_session.get("user")
+    logger.info(f"{user.identifier} has started the conversation")
     
     cl.user_session.set("agent_tools", [agent_tool])
     cl.user_session.set("context", Context(agent))
@@ -65,16 +69,19 @@ async def start():
             content="You are a helpful AI assistant. You can access tools using MCP servers if available."
         )
     )
-    cl.user_session.set("memory",memory,)
+    cl.user_session.set("memory",memory)
 
 @cl.on_message
 async def on_message(message: cl.Message):
     """On message handler to handle message received events"""
     
+    user = cl.user_session.get("user")
+    logger.info(f"Received message: '{message.content}' from {user.identifier}")
+    
     agent = cl.user_session.get("agent")
     memory = cl.user_session.get("memory")
     chat_history = memory.get()
-    msg = cl.Message("")
+    msg = cl.Message("", type="assistant_message")
     
     context = cl.user_session.get("context")
     handler = agent.run(
@@ -106,11 +113,80 @@ async def on_message(message: cl.Message):
     cl.user_session.set("memory", memory)
     
     await msg.send()
+    
+    msg.content=str(response)
+    await msg.update()
+    
+@cl.on_stop
+async def on_stop():
+    user = cl.user_session.get("user")
+    logger.info(f"{user.identifier} has stopped the task!")
+    await cl.Message("You have stopped the task!").send()
 
+@cl.on_chat_end
+def on_chat_end():
+    user = cl.user_session.get("user")
+    logger.info(f"{user.identifier} has ended the chat")
+
+@cl.on_chat_resume
+async def on_chat_resume(thread: ThreadDict):
+    """Handler function to resume a chat"""
+    
+    ## Restore memory buffer
+    memory = ChatMemoryBuffer.from_defaults()
+    root_messages = [m for m in thread["steps"] if m["parentId"] == None]
+    for message in root_messages:
+        print(message['output'])
+        if message["type"] == "user_message":
+            memory.put(
+                ChatMessage(
+                    role=MessageRole.USER,
+                    content=message['output']
+                )
+            )
+        else:
+            memory.put(
+                ChatMessage(
+                    role=MessageRole.ASSISTANT,
+                    content=message['output']
+                )
+            )
+    cl.user_session.set("memory", memory)
+    
+    # ## Restore agent
+    mcp_tools = cl.user_session.get("mcp_tools", {})
+    
+    agent_tool = FunctionTool.from_defaults(async_fn=move_map_to)
+    agent_tools = [agent_tool]
+    
+    if len(mcp_tools)>0:
+        agent = FunctionAgent(
+            tools=agent_tools.extend(list(mcp_tools.values())), #agent still has tools not removed
+            llm=openai_llm,
+        )
+    else:
+        agent = FunctionAgent(
+            tools=agent_tools,
+            llm=openai_llm,
+        )
+    cl.user_session.set("agent", agent)
+    cl.user_session.set("context", Context(agent))
+    
+    user = cl.user_session.get("user")
+    logger.info(f"{user} has resumed chat")
+    
+
+@cl.on_logout
+def on_logout(request: Request, response: Response):
+    ### Handler to tidy up resources
+    logger.info("Clearing cookies...")
+    for cookie_name in request.cookies.keys():
+        response.delete_cookie(cookie_name)
+    
 @cl.action_callback("close_map")
 async def on_test_action():
     """Callback handler to close the map"""
-    await cl.Message(content="Closed map! 🗺️").send()
+    await cl.Message(content="Closed map! 🗺️", type="assistant_message").send()
     await cl.ElementSidebar.set_elements([])
 
 @cl.set_starters
@@ -142,6 +218,9 @@ async def on_audio_start():
     cl.user_session.set("silent_duration_ms", 0)
     cl.user_session.set("is_speaking", False)
     cl.user_session.set("audio_chunks", [])
+    
+    user = cl.user_session.get("user")
+    logger.info(f"{user} is starting an audio stream...")
     return True
 
 @cl.on_audio_chunk
@@ -185,95 +264,6 @@ async def on_audio_chunk(chunk: cl.InputAudioChunk):
         cl.user_session.set("silent_duration_ms", 0)
         if not is_speaking:
             cl.user_session.set("is_speaking", True)
-    
-async def process_audio():
-    """ Processes the audio buffer from the session"""
-    
-    if audio_chunks := cl.user_session.get("audio_chunks"):
-        # Concatenate all chunks
-        concatenated = np.concatenate(list(audio_chunks))
-
-        # Create an in-memory binary stream
-        wav_buffer = io.BytesIO()
-
-        # Create WAV file with proper parameters
-        with wave.open(wav_buffer, "wb") as wav_file:
-            wav_file.setnchannels(1)  # mono
-            wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
-            wav_file.setframerate(24000)  # sample rate (24kHz PCM)
-            wav_file.writeframes(concatenated.tobytes())
-
-        # Reset buffer position
-        wav_buffer.seek(0)
-
-        cl.user_session.set("audio_chunks", [])
-
-    frames = wav_file.getnframes()
-    rate = wav_file.getframerate()
-
-    duration = frames / float(rate)
-    if duration <= 1.71:
-        print("The audio is too short, please try again.")
-        return
-
-    audio_buffer = wav_buffer.getvalue()
-
-    input_audio_el = cl.Audio(content=audio_buffer, mime="audio/wav")
-
-    whisper_input = ("audio.wav", audio_buffer, "audio/wav")
-    transcription = await speech_to_text(whisper_input)
-
-    await cl.Message(
-        author="You",
-        type="user_message",
-        content=transcription,
-        elements=[input_audio_el],
-    ).send()
-
-    ## Now to answer the question
-    agent = cl.user_session.get("agent")
-    memory = cl.user_session.get("memory")
-    chat_history = memory.get()
-    msg = cl.Message("")
-    
-    context = cl.user_session.get("context")
-    handler = agent.run(
-        transcription, 
-        chat_history = chat_history,
-        ctx = context
-    )
-    async for event in handler.stream_events():
-        if isinstance(event, AgentStream):
-            await msg.stream_token(event.delta)
-        elif isinstance(event, ToolCall):
-            with cl.Step(name=f"{event.tool_name} tool", type="tool"):
-                continue
-    
-    response = await handler
-    await msg.send()
-    memory.put(
-        ChatMessage(
-            role = MessageRole.USER,
-            content= transcription
-        )
-    )
-    memory.put(
-        ChatMessage(
-            role = MessageRole.ASSISTANT,
-            content = str(response)
-        )
-    )
-    cl.user_session.set("memory", memory)
-
-    _, output_audio = await text_to_speech(str(response), "audio/wav")
-
-    output_audio_el = cl.Audio(
-        auto_play=True,
-        mime="audio/wav",
-        content=output_audio,
-    )
-    msg.elements=[output_audio_el]
-    await msg.update()
 
 ## MCP Utilities
 @cl.on_mcp_connect
@@ -304,13 +294,13 @@ async def on_mcp_connect(connection):
         cl.user_session.set("context", Context(agent))
         cl.user_session.set("mcp_tools", mcp_tools)
         cl.user_session.set("mcp_tool_cache", mcp_cache)
-        await cl.Message(f"Connected to MCP server: {connection.name} on {connection.url}").send()
+        await cl.Message(f"Connected to MCP server: {connection.name} on {connection.url}", type="assistant_message").send()
 
         await cl.Message(
-            f"Found {len(new_tools)} tools from {connection.name} MCP server."
+            f"Found {len(new_tools)} tools from {connection.name} MCP server.", type="assistant_message"
         ).send()
     except Exception as e:
-        await cl.Message(f"Error conecting to tools from MCP server: {str(e)}").send()
+        await cl.Message(f"Error conecting to tools from MCP server: {str(e)}", type="assistant_message").send()
 
 @cl.on_mcp_disconnect
 async def on_mcp_disconnect(name: str):
@@ -343,7 +333,7 @@ async def on_mcp_disconnect(name: str):
     cl.user_session.set("mcp_tool_cache", mcp_cache)
     cl.user_session.set("agent", agent)
     
-    await cl.Message(f"Disconnected from MCP server: {name}").send()
+    await cl.Message(f"Disconnected from MCP server: {name}", type="assistant_message").send()
 
 ## Steps
 @cl.step(type="tool")
@@ -403,7 +393,7 @@ async def move_map_to(latitude: float, longitude: float):
 
     return "Map moved!"
 
-## Map utilities
+## Utility functions
 async def open_map(
     latitude: float = 1.290270, 
     longitude: float = 103.851959
@@ -414,3 +404,96 @@ async def open_map(
     custom_element = cl.CustomElement(name="Map", props=map_props, display="inline")
     await cl.ElementSidebar.set_title("canvas")
     await cl.ElementSidebar.set_elements([custom_element], key="map-canvas")
+
+async def process_audio():
+    """ Processes the audio buffer from the session"""
+    
+    if audio_chunks := cl.user_session.get("audio_chunks"):
+        # Concatenate all chunks
+        concatenated = np.concatenate(list(audio_chunks))
+
+        # Create an in-memory binary stream
+        wav_buffer = io.BytesIO()
+
+        # Create WAV file with proper parameters
+        with wave.open(wav_buffer, "wb") as wav_file:
+            wav_file.setnchannels(1)  # mono
+            wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
+            wav_file.setframerate(24000)  # sample rate (24kHz PCM)
+            wav_file.writeframes(concatenated.tobytes())
+
+        # Reset buffer position
+        wav_buffer.seek(0)
+
+        cl.user_session.set("audio_chunks", [])
+
+    frames = wav_file.getnframes()
+    rate = wav_file.getframerate()
+
+    duration = frames / float(rate)
+    if duration <= 1.71:
+        print("The audio is too short, please try again.")
+        return
+
+    audio_buffer = wav_buffer.getvalue()
+
+    input_audio_el = cl.Audio(content=audio_buffer, mime="audio/wav")
+
+    whisper_input = ("audio.wav", audio_buffer, "audio/wav")
+    transcription = await speech_to_text(whisper_input)
+    
+    user = cl.user_session.get("user")
+    logger.info(f"Received message: '{transcription}' from {user}")
+
+    await cl.Message(
+        author="You",
+        type="user_message",
+        content=transcription,
+        elements=[input_audio_el],
+    ).send()
+
+    ## Now to answer the question
+    agent = cl.user_session.get("agent")
+    memory = cl.user_session.get("memory")
+    chat_history = memory.get()
+    msg = cl.Message("", type="assistant_message")
+    
+    context = cl.user_session.get("context")
+    handler = agent.run(
+        transcription, 
+        chat_history = chat_history,
+        ctx = context
+    )
+    async for event in handler.stream_events():
+        if isinstance(event, AgentStream):
+            await msg.stream_token(event.delta)
+        elif isinstance(event, ToolCall):
+            with cl.Step(name=f"{event.tool_name} tool", type="tool"):
+                continue
+    
+    response = await handler
+    await msg.send()
+    memory.put(
+        ChatMessage(
+            role = MessageRole.USER,
+            content= transcription
+        )
+    )
+    memory.put(
+        ChatMessage(
+            role = MessageRole.ASSISTANT,
+            content = str(response)
+        )
+    )
+    cl.user_session.set("memory", memory)
+
+    _, output_audio = await text_to_speech(str(response), "audio/wav")
+
+    output_audio_el = cl.Audio(
+        auto_play=True,
+        mime="audio/wav",
+        content=output_audio,
+    )
+    msg.elements=[output_audio_el]
+    msg.content=str(response)
+    await msg.update()
