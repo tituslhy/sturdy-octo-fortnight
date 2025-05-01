@@ -14,11 +14,13 @@ import wave
 import numpy as np
 import audioop
 
+from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
 from llama_index.core.agent.workflow import FunctionAgent, AgentStream, ToolCall
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
-from llama_index.core.tools import FunctionTool
+from llama_index.core.tools import FunctionTool, QueryEngineTool
 from llama_index.core.memory import ChatMemoryBuffer
 from llama_index.core.workflow import Context
+from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.llms.openai import OpenAI
 from llama_index.tools.mcp import BasicMCPClient, McpToolSpec
 
@@ -31,6 +33,7 @@ logger = logging.getLogger(__name__)
 _ = load_dotenv(find_dotenv())
 
 openai_client = AsyncOpenAI() #for whisper
+embed_model = OllamaEmbedding(model_name="nomic-embed-text")
 
 ## Audio settings
 SILENCE_THRESHOLD = 3500  # Adjust based on your audio level (e.g., lower for quieter audio)
@@ -43,6 +46,10 @@ SYSTEM_PROMPTS = {
     "The Cowboy": "You are a helpful AI assistant who is also a cowboy! You can access tools using MCP servers if available but answer like a cowboy!",
 }
 
+commands = [
+    {"id": "Picture", "icon": "image", "description": "Use DALL-E"},
+]
+
 @cl.password_auth_callback
 def auth_callback(username: str, password: str) -> Optional[cl.User]:
     """Password auth handler for login"""
@@ -53,7 +60,7 @@ def auth_callback(username: str, password: str) -> Optional[cl.User]:
         return None
 
 @cl.set_chat_profiles
-async def chat_profiles():
+async def chat_profile():
     """Chat profile setter."""
     
     return [
@@ -74,6 +81,7 @@ async def start():
     """Handler for chat start events. Sets session variables."""
     
     # await open_map()
+    await cl.context.emitter.set_commands(commands)
     openai_llm = OpenAI(model="gpt-4o-mini", temperature=0)
     agent_tool = FunctionTool.from_defaults(async_fn=move_map_to)
     agent = FunctionAgent(tools=[agent_tool],llm=openai_llm,)
@@ -106,6 +114,11 @@ async def start():
                 values=["gpt-4o-mini", "gpt-4o"],
                 initial_index=0,
             ),
+            Switch(
+                id="Greet_on_message",
+                label="Greet user when message is received",
+                initial=False,
+            ),
             Slider(
                 id="Temperature",
                 label="Temperature of the LLM",
@@ -137,6 +150,8 @@ async def setup_agent(settings):
     logger.info("Agent instantiated")
     cl.user_session.set("agent", agent)
     
+    cl.user_session.set("greet", settings["Greet_on_message"])
+    
 
 @cl.on_message
 async def on_message(message: cl.Message):
@@ -145,46 +160,49 @@ async def on_message(message: cl.Message):
     user = cl.user_session.get("user")
     logger.info(f"Received message: '{message.content}' from {user.identifier}")
     
-    agent = cl.user_session.get("agent")
-    memory = cl.user_session.get("memory")
-    chat_history = memory.get()
-    msg = cl.Message("", type="assistant_message")
-    
-    context = cl.user_session.get("context")
-    
-    logger.info("Running agent on question")
-    handler = agent.run(
-        message.content, 
-        chat_history = chat_history,
-        ctx = context
-    )
-    async for event in handler.stream_events():
-        if isinstance(event, AgentStream):
-            await msg.stream_token(event.delta)
-        elif isinstance(event, ToolCall):
-            with cl.Step(name=f"{event.tool_name} tool", type="tool"):
-                continue
-    
-    response = await handler
-    
-    memory.put(
-        ChatMessage(
-            role = MessageRole.USER,
-            content= message.content
+    greet = cl.user_session.get("greet")
+    if greet is True:
+        await cl.Message(f"Hello there {user.identifier}!").send()
+    if message.command == "Picture":
+        response = openai_client.images.generate(
+            model="dall-e-3",
+            prompt = message.content,
+            size = "512x512"
         )
-    )
-    memory.put(
-        ChatMessage(
-            role = MessageRole.ASSISTANT,
-            content = str(response)
-        )
-    )
-    cl.user_session.set("memory", memory)
+        image_url = response['data'][0]['url']
+        elements = [cl.Image(url=image_url)]
+        await cl.Message(f"Here's what I generated for **{message.content}**", elements=elements).send()
     
-    await msg.send()
-    
-    msg.content=str(response)
-    await msg.update()
+    else:
+        if len(message.elements) > 0:
+            ## Builds an in-memory RAG engine
+            await cl.Message("Processing files").send()
+            filepaths = [file.path for file in message.elements]
+            filenames = [file.name for file in message.elements]
+            logger.info(f"filepaths: {filepaths}")
+            logger.info(f"filenames: {filenames}")
+            documents = SimpleDirectoryReader(input_files=filepaths).load_data()
+            index = VectorStoreIndex.from_documents(documents, embed_model=embed_model)
+            await cl.Message("Processed uploaded files").send()
+            
+            openai_llm = cl.user_session.get("llm")
+            name = openai_llm.complete(f"Based on these filenames, come up with a short, concise name that describes these documents. For example 'MBA Value Analysis'. Do not return any '.pdf' or file extensions, just the name. Filenames: {', '.join(filenames)}")
+            description = openai_llm.complete(f"Based on these filenames, come up with a consolidated description that describes these documents. For example 'Answers questions about animals'. Filenames: {', '.join(filenames)}")
+            await cl.Message(f"Uploaded document/s follow the theme: {name}. Here's the general description of the document/s uploaded: {description}").send()
+            
+            tool = QueryEngineTool.from_defaults(
+                query_engine=index.as_query_engine(similarity_top_k=8, llm=openai_llm),
+                name = "_".join(str(name).split(" ")),
+                description=str(description)
+            )
+            agent_tools = cl.user_session.get("agent_tools", [])
+            agent_tools.append(tool)
+            
+            agent = FunctionAgent(tools=agent_tools, llm=openai_llm)
+            cl.user_session.set("agent", agent)
+            cl.user_session.set("agent_tools", agent_tools)
+        
+        await generate_answer(message.content)
     
 @cl.on_stop
 async def on_stop():
@@ -210,32 +228,11 @@ async def on_chat_resume(thread: ThreadDict):
     
     ## Setup LLM
     openai_llm = OpenAI(model="gpt-4o-mini", temperature=0)
-    settings = await cl.ChatSettings(
-        [
-            (
-                Select(
-                    id="LLM",
-                    label="OpenAI model to use",
-                    values=["gpt-4o-mini", "gpt-4o"],
-                    initial_index=0,
-                ),
-                Slider(
-                    id="Temperature",
-                    label="Temperature of the LLM",
-                    initial=0,
-                    min=0,
-                    max=1,
-                    step=0.1
-                )
-            )
-        ]
-    ).send()
     
     ## Restore memory buffer
     memory = ChatMemoryBuffer.from_defaults()
     root_messages = [m for m in thread["steps"] if m["parentId"] == None]
     for message in root_messages:
-        print(message['output'])
         if message["type"] == "user_message":
             memory.put(
                 ChatMessage(
@@ -273,6 +270,7 @@ async def on_chat_resume(thread: ThreadDict):
     
     user = cl.user_session.get("user")
     logger.info(f"{user} has resumed chat")
+    await cl.Message("Chat resumed. Do note that previously uploaded documents will not be available in this chat and must be uploaded again").send()
     
 @cl.action_callback("close_map")
 async def on_test_action():
@@ -362,6 +360,7 @@ async def on_mcp_connect(connection):
     """Handler to connect to an MCP server. 
     Lists tools available on the server and connects these tools to
     the LLM agent."""
+    
     openai_llm = cl.user_session.get("llm")
     mcp_cache = cl.user_session.get("mcp_tool_cache", {})
     mcp_tools = cl.user_session.get("mcp_tools", {})
@@ -485,6 +484,42 @@ async def move_map_to(latitude: float, longitude: float):
     return "Map moved!"
 
 ## Utility functions
+async def generate_answer(query: str):
+    agent = cl.user_session.get("agent")
+    memory = cl.user_session.get("memory")
+    chat_history = memory.get()
+    msg = cl.Message("", type="assistant_message")
+    
+    context = cl.user_session.get("context")
+    handler = agent.run(
+        query, 
+        chat_history = chat_history,
+        ctx = context
+    )
+    async for event in handler.stream_events():
+        if isinstance(event, AgentStream):
+            await msg.stream_token(event.delta)
+        elif isinstance(event, ToolCall):
+            with cl.Step(name=f"{event.tool_name} tool", type="tool"):
+                continue
+    
+    response = await handler
+    await msg.send()
+    memory.put(
+        ChatMessage(
+            role = MessageRole.USER,
+            content= query
+        )
+    )
+    memory.put(
+        ChatMessage(
+            role = MessageRole.ASSISTANT,
+            content = str(response)
+        )
+    )
+    cl.user_session.set("memory", memory)
+    return msg
+
 async def open_map(
     latitude: float = 1.290270, 
     longitude: float = 103.851959
@@ -544,41 +579,9 @@ async def process_audio():
     ).send()
 
     ## Now to answer the question
-    agent = cl.user_session.get("agent")
-    memory = cl.user_session.get("memory")
-    chat_history = memory.get()
-    msg = cl.Message("", type="assistant_message")
-    
-    context = cl.user_session.get("context")
-    handler = agent.run(
-        transcription, 
-        chat_history = chat_history,
-        ctx = context
-    )
-    async for event in handler.stream_events():
-        if isinstance(event, AgentStream):
-            await msg.stream_token(event.delta)
-        elif isinstance(event, ToolCall):
-            with cl.Step(name=f"{event.tool_name} tool", type="tool"):
-                continue
-    
-    response = await handler
-    await msg.send()
-    memory.put(
-        ChatMessage(
-            role = MessageRole.USER,
-            content= transcription
-        )
-    )
-    memory.put(
-        ChatMessage(
-            role = MessageRole.ASSISTANT,
-            content = str(response)
-        )
-    )
-    cl.user_session.set("memory", memory)
+    msg = await generate_answer(transcription)
 
-    _, output_audio = await text_to_speech(str(response), "audio/wav")
+    _, output_audio = await text_to_speech(msg.content, "audio/wav")
 
     output_audio_el = cl.Audio(
         auto_play=True,
@@ -586,5 +589,4 @@ async def process_audio():
         content=output_audio,
     )
     msg.elements=[output_audio_el]
-    msg.content=str(response)
     await msg.update()
