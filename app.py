@@ -164,12 +164,13 @@ async def on_message(message: cl.Message):
     if greet is True:
         await cl.Message(f"Hello there {user.identifier}!").send()
     if message.command == "Picture":
-        response = openai_client.images.generate(
+        response = await openai_client.images.generate(
             model="dall-e-3",
             prompt = message.content,
-            size = "512x512"
+            size = "1024x1024"
         )
-        image_url = response['data'][0]['url']
+        logger.info(f"Image generated. Reponse: {response}")
+        image_url = response.data[0].url
         elements = [cl.Image(url=image_url)]
         await cl.Message(f"Here's what I generated for **{message.content}**", elements=elements).send()
     
