@@ -1,17 +1,32 @@
 # sturdy-octo-fortnight
 The Chainlit introduction repository
 
+<p align="center">
+    <img src="./images/Home.png">
+</p>
+
 ## Setup
 ### Install the requirements
 ```
-poetry install
+pip install -r requirements.txt
 ```
-### Pull the docker image
+
+## The Jira MCP
+<p align="center">
+    <img src="./images/jira_issue_assignment.png">
+</p>
+<p align="center">
+    <img src="./images/jira_mark_as_complete.png">
+</p>
+<p align="center">
+    <img src="./images/jira_dashboard.png">
+</p>
+
+#### Pull the docker image
 ```
 docker pull ghcr.io/sooperset/mcp-atlassian:latest
 ```
-
-### Environment variables
+#### Environment variables
 Here are the environment variables needed for the MCP server
 ```
 "CONFLUENCE_URL": "https://your-company.atlassian.net/wiki",
@@ -24,14 +39,14 @@ Here are the environment variables needed for the MCP server
 
 We use Azure OpenAI for this use case but any LLM will do. Be sure to key in the LLM's API key into the .env file.
 
-### Run the container
+#### Run the container
 ```
 docker run --rm -p 9000:9000 \
   --env-file ./.env \
   ghcr.io/sooperset/mcp-atlassian:latest \
   --transport sse --port 9000 -vv
 ```
-### Connect to the mcpServer
+#### Connect to the mcpServer
 ```
 {
   "mcpServers": {
@@ -42,16 +57,16 @@ docker run --rm -p 9000:9000 \
 }
 ```
 
-## Key Tools
+### Key MCP Tools
 
-### Confluence Tools
+#### Confluence Tools
 
 - `confluence_search`: Search Confluence content using CQL
 - `confluence_get_page`: Get content of a specific page
 - `confluence_create_page`: Create a new page
 - `confluence_update_page`: Update an existing page
 
-### Jira Tools
+#### Jira Tools
 
 - `jira_get_issue`: Get details of a specific issue
 - `jira_search`: Search issues using JQL
