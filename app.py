@@ -135,7 +135,7 @@ async def setup_agent(settings):
     else:
         agent = FunctionAgent(tools=agent_tools, llm=openai_llm)
     logger.info("Agent instantiated")
-    cl.user_session.set("agnet", agent)
+    cl.user_session.set("agent", agent)
     
 
 @cl.on_message
