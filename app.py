@@ -99,22 +99,20 @@ async def start():
     cl.user_session.set("memory", memory)
     
     settings = await cl.ChatSettings(
-        [
-            (
-                Select(
-                    id="LLM",
-                    label="OpenAI model to use",
-                    values=["gpt-4o-mini", "gpt-4o"],
-                    initial_index=0,
-                ),
-                Slider(
-                    id="Temperature",
-                    label="Temperature of the LLM",
-                    initial=0,
-                    min=0,
-                    max=1,
-                    step=0.1
-                )
+        [            
+            Select(
+                id="LLM",
+                label="OpenAI model to use",
+                values=["gpt-4o-mini", "gpt-4o"],
+                initial_index=0,
+            ),
+            Slider(
+                id="Temperature",
+                label="Temperature of the LLM",
+                initial=0,
+                min=0,
+                max=1,
+                step=0.1
             )
         ]
     ).send()
