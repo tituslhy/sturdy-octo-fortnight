@@ -182,7 +182,11 @@ async def on_message(message: cl.Message):
             filenames = [file.name for file in message.elements]
             logger.info(f"filepaths: {filepaths}")
             logger.info(f"filenames: {filenames}")
+            
+            ## Convert uploaded documents to LlamaIndex Document objects 
             documents = SimpleDirectoryReader(input_files=filepaths).load_data()
+            
+            ## Ingest documents into in-memory Vector Database.
             index = VectorStoreIndex.from_documents(documents, embed_model=embed_model)
             await cl.Message("Processed uploaded files").send()
             
