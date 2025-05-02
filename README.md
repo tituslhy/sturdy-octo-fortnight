@@ -13,13 +13,13 @@ pip install -r requirements.txt
 
 ## The Jira MCP
 <p align="center">
-    <img src="./public/jira_issue_assignment.png">
+    <img src="./public/jirachat_issue_assignment.png">
 </p>
 <p align="center">
     <img src="./public/jira_mark_as_complete.png">
 </p>
 <p align="center">
-    <img src="./public/jira_dashboard.png">
+    <img src="./public/jira dashboard.png">
 </p>
 
 #### Pull the docker image
