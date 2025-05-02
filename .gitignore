@@ -1,5 +1,5 @@
 .files/
-mock.py
+mock/
 .DS_Store
 
 # Byte-compiled / optimized / DLL files
