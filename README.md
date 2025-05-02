@@ -1,5 +1,7 @@
 # sturdy-octo-fortnight
-The Chainlit introduction repository
+The Chainlit introduction repository. This repository is a companion resource to an upcoming medium article!
+
+We'll go through how to do everything in this image to setup your own ChatGPT!
 
 <p align="center">
     <img src="./public/Home.png">
@@ -11,16 +13,8 @@ The Chainlit introduction repository
 pip install -r requirements.txt
 ```
 
-## The Jira MCP
-<p align="center">
-    <img src="./public/jirachat_issue_assignment.png">
-</p>
-<p align="center">
-    <img src="./public/jira_mark_as_complete.png">
-</p>
-<p align="center">
-    <img src="./public/jira dashboard.png">
-</p>
+### The Jira MCP
+Here's how to set up your Jira MCP!
 
 #### Pull the docker image
 ```
@@ -113,3 +107,13 @@ chainlit run app.py
 ```
 
 Then click the "cable" connector in the chatbar and connect to the Jira MCP
+
+<p align="center">
+    <img src="./public/jirachat_issue_assignment.png">
+</p>
+<p align="center">
+    <img src="./public/jira_mark_as_complete.png">
+</p>
+<p align="center">
+    <img src="./public/jira dashboard.png">
+</p>
