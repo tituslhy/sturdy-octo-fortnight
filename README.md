@@ -17,7 +17,7 @@ We'll go through how to do everything in this image to setup your own ChatGPT!
 pip install -r requirements.txt
 ```
 
-### The Jira MCP
+## The Jira MCP
 Here's how to set up your Jira MCP!
 
 #### Pull the docker image
