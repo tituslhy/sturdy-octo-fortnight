@@ -113,6 +113,15 @@ chainlit run app.py
 Then click the "cable" connector in the chatbar and connect to the Jira MCP
 
 <p align="center">
+    <img src="./public/mcp_connection_screenshot.png">
+</p>
+<p align="center">
+    <img src="./public/mcp_connection_screenshot2.png">
+</p>
+<p align="center">
+    <img src="./public/mcp_connection_screenshot3.png">
+</p>
+<p align="center">
     <img src="./public/jirachat_issue_assignment.png">
 </p>
 <p align="center">
