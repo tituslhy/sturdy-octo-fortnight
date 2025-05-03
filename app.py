@@ -131,7 +131,7 @@ async def setup_agent(settings):
         model=settings["LLM"], 
         temperature=settings["Temperature"]
     )
-    logger.info(f"New settings received. LLM: {settings["LLM"]} | Temperature: {settings["Temperature"]}")
+    logger.info(f"New settings received. LLM: {settings['LLM']} | Temperature: {settings['Temperature']}")
     cl.user_session.set("llm", openai_llm)
     
     agent_tools = cl.user_session.get("agent_tools")
