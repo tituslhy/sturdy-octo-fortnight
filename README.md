@@ -1,9 +1,9 @@
 # sturdy-octo-fortnight
 The Chainlit introduction repository. This repository is a companion resource to the following medium articles:
 
-[Part 1: I love Streamlit but I use Chainlit exclusively for LLM apps (and you should too)](https://medium.com/mitb-for-all/its-2025-start-using-chainlit-for-your-llm-apps-558db1a46315)
+- [Part 1: I love Streamlit but I use Chainlit exclusively for LLM apps (and you should too)](https://medium.com/mitb-for-all/its-2025-start-using-chainlit-for-your-llm-apps-558db1a46315)
 
-Part 2: Coming up soon!
+- Part 2: Coming up soon!
 
 We'll go through how to do everything in this image to setup your own ChatGPT!
 
