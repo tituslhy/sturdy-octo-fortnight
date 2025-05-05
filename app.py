@@ -200,7 +200,14 @@ async def on_message(message: cl.Message):
             cl.user_session.set("agent", agent)
             cl.user_session.set("agent_tools", agent_tools)
         
-        await generate_answer(message.content)
+        reply = await generate_answer(message.content)
+        
+        if cl.context.session.client_type == "copilot":
+            fn = cl.CopilotFunction(
+                name="test", #we invoke this copilot only if the name is "test"
+                args={"message": message.content, "response": reply.content}
+            )
+            await fn.acall()
     
 @cl.on_stop
 async def on_stop():

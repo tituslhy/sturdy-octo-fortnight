@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=<device-width>, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <!-- ... -->
+  <script src="http://localhost:8001/copilot/index.js"></script>
+  <script>
+    window.mountChainlitWidget({
+        chainlitServer: "http://localhost:8001",
+      });
+    window.addEventListener("chainlit-call-fn", (e) => {
+      const { name, args, callback } = e.detail;
+      if (name=="test"){
+        callback(args.response); //send the results in this callback function
+      }
+    });
+  </script>
+</body>
+</html>

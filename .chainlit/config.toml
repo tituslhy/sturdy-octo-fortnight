@@ -16,7 +16,7 @@ user_session_timeout = 1296000 # 15 days
 cache = false
 
 # Authorized origins
-allow_origins = ["*"]
+allow_origins = ["http://127.0.0.1:5500", "*"]
 
 [features]
 # Process and display HTML in messages. This can be a security risk (see https://stackoverflow.com/questions/19603097/why-is-it-dangerous-to-render-user-generated-html-or-javascript)
