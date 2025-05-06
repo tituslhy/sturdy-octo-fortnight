@@ -35,8 +35,6 @@ Here are the environment variables needed for the MCP server
 "JIRA_API_TOKEN": "your_jira_api_token"
 ```
 
-We use Azure OpenAI for this use case but any LLM will do. Be sure to key in the LLM's API key into the .env file.
-
 #### Run the container
 ```
 docker run --rm -p 9000:9000 \
