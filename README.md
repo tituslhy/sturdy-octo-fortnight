@@ -3,7 +3,7 @@ The Chainlit introduction repository. This repository is a companion resource to
 
 - [Part 1: I love Streamlit but I use Chainlit exclusively for LLM apps (and you should too)](https://medium.com/mitb-for-all/its-2025-start-using-chainlit-for-your-llm-apps-558db1a46315)
 
-- Part 2: Coming up soon!
+- [Part 2: Take your LLM apps to the next level with Chainlit!](https://medium.com/p/00036c8db1ba#111f-7fbcc3cba0b1)
 
 We'll go through how to do everything in this image to setup your own ChatGPT!
 
