@@ -1,4 +1,4 @@
-# sturdy-octo-fortnight
+# Getting started with Chainlit
 The Chainlit introduction repository. This repository is a companion resource to the following medium articles:
 
 - [Part 1: I love Streamlit but I use Chainlit exclusively for LLM apps (and you should too)](https://medium.com/mitb-for-all/its-2025-start-using-chainlit-for-your-llm-apps-558db1a46315)
