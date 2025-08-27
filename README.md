@@ -14,7 +14,7 @@ We'll go through how to do everything in this image to setup your own ChatGPT!
 ## Setup
 ### Install the requirements
 ```
-pip install -r requirements.txt
+uv sync
 ```
 
 ## The Jira MCP
