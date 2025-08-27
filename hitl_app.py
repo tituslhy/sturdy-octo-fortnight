@@ -25,27 +25,6 @@ async def dangerous_task(ctx: Context) -> str:
     else:
         return "Dangerous task aborted"
 
-async def run_agent(
-    agent: FunctionAgent, ctx: Context, message: str
-):
-    handler = agent.run(message, ctx=ctx)
-    async for event in handler.stream_events():
-        if isinstance(event, AgentStream):
-            yield event.delta
-        if isinstance(event, InputRequiredEvent):
-            input_ev = event
-            cl.user_session.set("input_ev", input_ev)
-            yield event.prefix            
-            break
-        
-    ctx_dict = handler.ctx.to_dict(serializer=JsonSerializer())
-    cl.user_session.set("context", ctx_dict)
-
-async def continue_agent(
-    agent: FunctionAgent, ctx: Context, user_response: str
-) -> str:
-    ...
-
 def setup_agent() -> FunctionAgent:
     llm = Ollama(model="qwen2.5", temperature=0)
     
@@ -61,6 +40,7 @@ def setup_agent() -> FunctionAgent:
 async def on_chat_start():
     agent = setup_agent()
     ctx = Context(agent)
+    cl.user_session.set("last_event", None)
     cl.user_session.set("agent", agent)
     cl.user_session.set("context", ctx.to_dict(serializer=JsonSerializer()))
     cl.user_session.set("input_ev", None)
@@ -79,12 +59,17 @@ async def on_message(message: cl.Message):
         async for event in handler.stream_events():
             if isinstance(event, AgentStream):
                 await msg.stream_token(event.delta)
+                cl.user_session.set("last_event", "stop_event")
             if isinstance(event, InputRequiredEvent):
                 input_ev = event
                 cl.user_session.set("context", ctx.to_dict(serializer=JsonSerializer()))
                 cl.user_session.set("input_ev", input_ev)
-                await cl.Message(content=event.prefix).send()
+                for chunk in event.prefix.split(" "):
+                    await msg.stream_token(chunk)
+                msg.content = event.prefix
+                cl.user_session.set("last_event", "input_required_event")
                 break
+        
     
     else: 
         handler = agent.run(ctx=ctx)
@@ -98,13 +83,21 @@ async def on_message(message: cl.Message):
             if isinstance(event, AgentStream):
                 await msg.stream_token(event.delta)
                 cl.user_session.set("input_ev", None)
+                cl.user_session.set("last_event", "stop_event")
             if isinstance(event, InputRequiredEvent):
                 input_ev = event
                 cl.user_session.set("context", ctx.to_dict(serializer=JsonSerializer()))
                 cl.user_session.set("input_ev", input_ev)
-                await cl.Message(content=event.prefix).send()
+                for chunk in event.prefix.split(" "):
+                    await msg.stream_token(chunk)
+                msg.content = event.prefix
+                cl.user_session.set("last_event", "stop_event")
                 break
     
-    if input_ev is None:
-        msg.content = await handler
-        await msg.update()
+    last_event = cl.user_session.get("last_event")
+    if last_event == "stop_event":
+        response = await handler
+        msg.content = str(response)
+        
+    await msg.update()
+    
